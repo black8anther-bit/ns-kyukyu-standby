@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nsの救急待機 — 土日は別の順番</title>
+<style>
+:root {
+  --ink:#1b365d;
+  --muted:#3e5680;
+  --sat:#1d4ed8;
+  --sun:#be123c;
+  --line:rgba(255,255,255,.85);
+  --card:rgba(255,255,255,.5);
+}
+* { box-sizing:border-box; }
+html,body { margin:0; }
+body {
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  color:var(--ink);
+  background:#d7e6f8;
+  line-height:1.55;
+}
+body::before {
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  background:
+    radial-gradient(ellipse 55% 40% at 8% -5%, #9ec9f0 0%, transparent 70%),
+    radial-gradient(ellipse 50% 42% at 100% 8%, #c4b5fd 0%, transparent 68%),
+    radial-gradient(ellipse 60% 40% at 50% 110%, #e0e7ff 0%, transparent 70%),
+    #d5e4f7;
+}
+main { max-width:1040px; margin:0 auto; padding:28px 16px 72px; }
+h1 { font-size:clamp(26px,4.6vw,40px); line-height:1.25; margin:0 0 10px; letter-spacing:.01em; }
+h2 { font-size:20px; margin:0 0 8px; }
+p { margin:0 0 10px; }
+.lead { font-size:17px; margin:0; }
+.card {
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:22px;
+  box-shadow:0 12px 32px rgba(27,54,93,.08), inset 0 1px 0 rgba(255,255,255,.9);
+  backdrop-filter:blur(16px) saturate(140%);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);
+  padding:18px 16px;
+  margin:14px 0;
+}
+.note { color:var(--muted); font-size:13px; }
+.locks { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.lock {
+  min-width:108px;
+  flex:1;
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:18px;
+  padding:12px 10px 10px;
+  text-align:center;
+  box-shadow:inset 0 1px 0 #fff;
+}
+.lock b { display:block; font-size:36px; line-height:1; }
+.lock span { display:block; margin-top:4px; font-size:13px; font-weight:600; }
+.lock.sat { color:var(--sat); }
+.lock.sun { color:var(--sun); }
+.facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-top:12px; }
+.fact {
+  background:rgba(255,255,255,.38);
+  border-radius:14px;
+  padding:10px 12px;
+}
+.fact b { display:block; font-size:18px; }
+.fact span { font-size:12px; color:var(--muted); }
+ul { margin:8px 0 0; padding-left:1.2em; }
+li { margin:4px 0; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chip {
+  width:72px;
+  border-radius:16px;
+  padding:8px 4px 7px;
+  text-align:center;
+  background:rgba(255,255,255,.48);
+  border:1px solid rgba(255,255,255,.85);
+}
+.chip b { display:block; font-size:18px; }
+.chip span { font-size:12px; color:var(--muted); }
+.chip.sat { background:rgba(219,234,254,.78); color:var(--sat); }
+.chip.sat span { color:var(--sat); }
+.chip.sun { background:rgba(255,228,230,.8); color:var(--sun); }
+.chip.sun span { color:var(--sun); }
+.pills { display:flex; flex-wrap:wrap; gap:8px; }
+.pill {
+  width:92px;
+  border-radius:16px;
+  padding:8px 6px;
+  background:rgba(255,255,255,.5);
+  border:1px solid rgba(255,255,255,.9);
+}
+.pill b { display:block; font-size:20px; }
+.pill span,.pill small { display:block; font-size:12px; }
+.pill small { color:var(--muted); }
+.pill.sat { background:rgba(219,234,254,.8); color:var(--sat); }
+.pill.sun { background:rgba(255,228,230,.84); color:var(--sun); }
+.pill.anchor { outline:2px solid var(--ink); }
+.legend { display:flex; flex-wrap:wrap; gap:10px 14px; font-size:12px; color:var(--muted); margin:8px 0 4px; }
+.legend i { display:inline-block; width:18px; height:8px; border-radius:99px; margin-right:4px; vertical-align:middle; }
+.legend .now { background:#c2410c; }
+.legend .alt { background:#0f766e; }
+.headrow,.prow { display:grid; grid-template-columns:52px 1fr 108px; gap:8px; align-items:center; }
+.headrow { font-size:11px; color:var(--muted); padding:0 0 6px; }
+.nums { display:grid; grid-template-columns:1fr 1fr 1fr; text-align:right; gap:2px; }
+.headrow .nums span { font-size:10px; }
+.prow { margin:7px 0; }
+.pid b { font-size:16px; }
+.pid span { display:block; font-size:11px; color:var(--muted); }
+.prow.sat .pid,.prow.sat .pid span { color:var(--sat); }
+.prow.sun .pid,.prow.sun .pid span { color:var(--sun); }
+.tracks { display:grid; gap:4px; }
+.track { height:8px; border-radius:99px; background:rgba(27,54,93,.08); overflow:hidden; }
+.track i { display:block; height:100%; border-radius:99px; }
+.track .now { background:#c2410c; }
+.track .alt { background:#0f766e; }
+.nums { font-variant-numeric:tabular-nums; font-weight:650; font-size:14px; }
+.toggles { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
+.toggles button {
+  font:inherit;
+  font-size:14px;
+  color:var(--ink);
+  background:rgba(255,255,255,.45);
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:999px;
+  padding:8px 14px;
+  cursor:pointer;
+}
+.toggles button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+.months { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.month {
+  background:rgba(255,255,255,.38);
+  border:1px solid rgba(255,255,255,.8);
+  border-radius:18px;
+  padding:10px;
+}
+.month h3 { margin:0 0 8px; font-size:15px; }
+.dow,.grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.dow span { text-align:center; font-size:10px; color:var(--muted); }
+.dow .sat { color:var(--sat); }
+.dow .sun { color:var(--sun); }
+.cell {
+  min-height:42px;
+  border-radius:10px;
+  text-align:center;
+  padding:3px 0 2px;
+}
+.cell .dn { display:block; font-size:10px; color:var(--muted); }
+.cell .who { display:block; font-size:14px; font-weight:700; line-height:1.2; min-height:17px; }
+.cell.em { background:rgba(255,255,255,.62); }
+.cell.sat { background:rgba(219,234,254,.86); color:var(--sat); }
+.cell.sat .dn { color:var(--sat); }
+.cell.sun { background:rgba(255,228,230,.9); color:var(--sun); }
+.cell.sun .dn { color:var(--sun); }
+.cell.anchor { outline:2px solid var(--ink); outline-offset:0; }
+.cell.hol .dn { text-decoration:underline; text-underline-offset:2px; }
+.wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums; }
+th,td { padding:6px 6px; text-align:left; white-space:nowrap; }
+th { font-size:12px; color:var(--muted); font-weight:600; }
+tr.sat td { color:var(--sat); }
+tr.sun td { color:var(--sun); }
+tbody tr:nth-child(odd) { background:rgba(255,255,255,.28); }
+.two { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:800px) { .two { grid-template-columns:1fr 1fr; } }
+.good h2 { color:#0f766e; }
+.bad h2 { color:#9a3412; }
+.dates { display:flex; flex-wrap:wrap; gap:6px; }
+.dates span {
+  background:rgba(255,255,255,.5);
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:12px;
+}
+a { color:var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <p class="note">Nsの救急待機　2026年1月〜2027年12月</p>
+    <h1>土日の救急日は、4人に固定される</h1>
+    <p class="lead">今の1本の列では、土日の担当は B、C、I、J だけです。土日の救急日だけ別の順番にすると、14人に順に回ります。</p>
+    <p class="note">Aが1番、Bが2番、Cが3番、…、Nが14番です。</p>
+    <div class="locks">
+      <div class="lock sat"><b>B</b><span>毎回 土曜</span></div>
+      <div class="lock sun"><b>C</b><span>毎回 日曜</span></div>
+      <div class="lock sat"><b>I</b><span>毎回 土曜</span></div>
+      <div class="lock sun"><b>J</b><span>毎回 日曜</span></div>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>91回</b><span>期間中の救急日。平日65、土日26</span></div>
+      <div class="fact"><b>6か7回</b><span>1人の合計。回数は近い。偏るのは曜日</span></div>
+      <div class="fact"><b>112日</b><span>現状では、次の自分の番までいつもこの間隔</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>基点と、1月への戻り</h2>
+    <p>2026-10-02（金）を A にします。救急日は8日おきで、曜日が1つずつ遅れます。10月2日より前は、同じ間隔で担当を戻します。直前の9月24日は N、年初の1月3日は I です。</p>
+    <div class="pills">
+      <div class="pill sat"><b>I</b><span>1/3 土</span><small>戻り始め</small></div>
+      <div class="pill"><b>N</b><span>9/24 木</span><small>基点の1つ前</small></div>
+      <div class="pill anchor"><b>A</b><span>10/2 金</span><small>基点</small></div>
+      <div class="pill sat"><b>B</b><span>10/10 土</span><small>現状の次</small></div>
+    </div>
+    <ul>
+      <li>1月1日と1月2日は、この8日の並びに乗りません。2026年の最初の救急日は1月3日（土）です。</li>
+      <li>期間の最後の救急日は2027-12-24（金、A）です。</li>
+      <li>別列の土日も、10月10日（土）を同じ順なら A、Hからなら H として、1月側へ戻しています。平日の祝日は平日列のままです。</li>
+      <li>遅出、休みで抜ける人、出られないときの次の人は入れていません。</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>担当と曜日は、ずれない</h2>
+    <p>14人で一周するあいだに、曜日は元へ戻ります。14が7の倍数だからです。1月へ戻しても、2027年まで進めても、この対応は同じです。</p>
+    <div class="chips">
+      <div class="chip"><b>A</b><span>金</span></div>
+      <div class="chip sat"><b>B</b><span>土</span></div>
+      <div class="chip sun"><b>C</b><span>日</span></div>
+      <div class="chip"><b>D</b><span>月</span></div>
+      <div class="chip"><b>E</b><span>火</span></div>
+      <div class="chip"><b>F</b><span>水</span></div>
+      <div class="chip"><b>G</b><span>木</span></div>
+      <div class="chip"><b>H</b><span>金</span></div>
+      <div class="chip sat"><b>I</b><span>土</span></div>
+      <div class="chip sun"><b>J</b><span>日</span></div>
+      <div class="chip"><b>K</b><span>月</span></div>
+      <div class="chip"><b>L</b><span>火</span></div>
+      <div class="chip"><b>M</b><span>水</span></div>
+      <div class="chip"><b>N</b><span>木</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>基点から14回</h2>
+    <p>10月2日から14回で、現状は各自ちょうど1回です。土と日に色が付きます。この14回のうち土日は B、C、I、J です。文化の日（11/3）は火曜で、E です。</p>
+    <div class="pills">
+      <div class="pill wd anchor"><b>A</b><span>10/2 金</span></div><div class="pill sat"><b>B</b><span>10/10 土</span></div><div class="pill sun"><b>C</b><span>10/18 日</span></div><div class="pill wd"><b>D</b><span>10/26 月</span></div><div class="pill wd"><b>E</b><span>11/3 火</span><small>文化の日</small></div><div class="pill wd"><b>F</b><span>11/11 水</span></div><div class="pill wd"><b>G</b><span>11/19 木</span></div><div class="pill wd"><b>H</b><span>11/27 金</span></div><div class="pill sat"><b>I</b><span>12/5 土</span></div><div class="pill sun"><b>J</b><span>12/13 日</span></div><div class="pill wd"><b>K</b><span>12/21 月</span></div><div class="pill wd"><b>L</b><span>12/29 火</span></div><div class="pill wd"><b>M</b><span>1/6 水</span></div><div class="pill wd"><b>N</b><span>1/14 木</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>土日の回数</h2>
+    <p>棒は期間全体の土日の救急回数です。橙が現状、緑が別列（同じ順）。右の3つの数字は回数です。現状、同じ順、Hから、の順です。最大は7回なので、橙が長い人に土日が集まっています。</p>
+    <div class="legend"><span><i class="now"></i>現状</span><span><i class="alt"></i>別列（同じ順）</span><span>右端は Hから</span></div>
+    <div class="headrow"><span>人</span><span></span><span class="nums"><span>現状</span><span>別列</span><span>H始</span></span></div>
+    <div class="prow wd">
+      <div class="pid"><b>A</b><span>金</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow sat">
+      <div class="pid"><b>B</b><span>土</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:85.71%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>6</span><span>2</span><span>2</span></div>
+    </div><div class="prow sun">
+      <div class="pid"><b>C</b><span>日</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:85.71%"></i></div>
+        <div class="track"><i class="alt" style="width:14.29%"></i></div>
+      </div>
+      <div class="nums"><span>6</span><span>1</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>D</b><span>月</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:14.29%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>1</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>E</b><span>火</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>F</b><span>水</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>G</b><span>木</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>H</b><span>金</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow sat">
+      <div class="pid"><b>I</b><span>土</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:100.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>7</span><span>2</span><span>2</span></div>
+    </div><div class="prow sun">
+      <div class="pid"><b>J</b><span>日</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:100.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>7</span><span>2</span><span>1</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>K</b><span>月</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>1</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>L</b><span>火</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>M</b><span>水</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div><div class="prow wd">
+      <div class="pid"><b>N</b><span>木</span></div>
+      <div class="tracks">
+        <div class="track"><i class="now" style="width:0.00%"></i></div>
+        <div class="track"><i class="alt" style="width:28.57%"></i></div>
+      </div>
+      <div class="nums"><span>0</span><span>2</span><span>2</span></div>
+    </div>
+    <p class="note" style="margin-top:12px">2026年の土日は14回です。別列は、同じ順でも Hからでも、14人とも1回です。現状は I と J が4回、B と C が3回です。</p>
+    <p class="note">2027年の土日は12回です。現状は4人が3回ずつ。同じ順では C と D が0回、ほかは1回。Hからでは J と K が0回、ほかは1回です。</p>
+    <p class="note">合計（平日＋土日）は、現状が6か7回、同じ順が5〜7回、Hからが6か7回です。平日の内訳は、別列では開始の文字を変えても同じです。</p>
+  </section>
+
+  <section class="card" id="cal">
+    <h2>カレンダー</h2>
+    <p>札の文字が担当です。小さい数字は日付です。青が土曜の救急日、赤が日曜の救急日、紺の枠が基点の10月2日です。日付に下線がある日は祝日です。祝日でも、8日の並びに乗らなければ札は付きません。</p>
+    <div class="toggles" role="group" aria-label="表示する順番">
+      <button type="button" class="on" data-mode="main">現状</button>
+      <button type="button" data-mode="same">別列（同じ順）</button>
+      <button type="button" data-mode="off">別列（Hから）</button>
+    </div>
+    <div class="months" id="months"></div>
+  </section>
+
+  <section class="card">
+    <h2>土日の救急日</h2>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>年</th><th>日付</th><th>曜</th><th>現状</th><th>同じ順</th><th>Hから</th><th>祝日</th></tr></thead>
+        <tbody>
+          <tr class="sat"><td>2026</td><td>1/3</td><td>土</td><td>I</td><td>E</td><td>L</td><td></td></tr><tr class="sun"><td>2026</td><td>1/11</td><td>日</td><td>J</td><td>F</td><td>M</td><td></td></tr><tr class="sat"><td>2026</td><td>2/28</td><td>土</td><td>B</td><td>G</td><td>N</td><td></td></tr><tr class="sun"><td>2026</td><td>3/8</td><td>日</td><td>C</td><td>H</td><td>A</td><td></td></tr><tr class="sat"><td>2026</td><td>4/25</td><td>土</td><td>I</td><td>I</td><td>B</td><td></td></tr><tr class="sun"><td>2026</td><td>5/3</td><td>日</td><td>J</td><td>J</td><td>C</td><td>憲法記念日</td></tr><tr class="sat"><td>2026</td><td>6/20</td><td>土</td><td>B</td><td>K</td><td>D</td><td></td></tr><tr class="sun"><td>2026</td><td>6/28</td><td>日</td><td>C</td><td>L</td><td>E</td><td></td></tr><tr class="sat"><td>2026</td><td>8/15</td><td>土</td><td>I</td><td>M</td><td>F</td><td></td></tr><tr class="sun"><td>2026</td><td>8/23</td><td>日</td><td>J</td><td>N</td><td>G</td><td></td></tr><tr class="sat"><td>2026</td><td>10/10</td><td>土</td><td>B</td><td>A</td><td>H</td><td></td></tr><tr class="sun"><td>2026</td><td>10/18</td><td>日</td><td>C</td><td>B</td><td>I</td><td></td></tr><tr class="sat"><td>2026</td><td>12/5</td><td>土</td><td>I</td><td>C</td><td>J</td><td></td></tr><tr class="sun"><td>2026</td><td>12/13</td><td>日</td><td>J</td><td>D</td><td>K</td><td></td></tr><tr class="sat"><td>2027</td><td>1/30</td><td>土</td><td>B</td><td>E</td><td>L</td><td></td></tr><tr class="sun"><td>2027</td><td>2/7</td><td>日</td><td>C</td><td>F</td><td>M</td><td></td></tr><tr class="sat"><td>2027</td><td>3/27</td><td>土</td><td>I</td><td>G</td><td>N</td><td></td></tr><tr class="sun"><td>2027</td><td>4/4</td><td>日</td><td>J</td><td>H</td><td>A</td><td></td></tr><tr class="sat"><td>2027</td><td>5/22</td><td>土</td><td>B</td><td>I</td><td>B</td><td></td></tr><tr class="sun"><td>2027</td><td>5/30</td><td>日</td><td>C</td><td>J</td><td>C</td><td></td></tr><tr class="sat"><td>2027</td><td>7/17</td><td>土</td><td>I</td><td>K</td><td>D</td><td></td></tr><tr class="sun"><td>2027</td><td>7/25</td><td>日</td><td>J</td><td>L</td><td>E</td><td></td></tr><tr class="sat"><td>2027</td><td>9/11</td><td>土</td><td>B</td><td>M</td><td>F</td><td></td></tr><tr class="sun"><td>2027</td><td>9/19</td><td>日</td><td>C</td><td>N</td><td>G</td><td></td></tr><tr class="sat"><td>2027</td><td>11/6</td><td>土</td><td>I</td><td>A</td><td>H</td><td></td></tr><tr class="sun"><td>2027</td><td>11/14</td><td>日</td><td>J</td><td>B</td><td>I</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>祝日に重なった救急日</h2>
+    <p>この周期で、2026年と2027年の祝日・振替休日・国民の休日と重なった救急日は3日です。</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>日付</th><th>名前</th><th>列</th><th>現状</th><th>別列</th></tr></thead>
+        <tbody>
+          <tr class="sun"><td>2026-05-03</td><td>憲法記念日</td><td>土日</td><td>J</td><td>同じ順 J、Hから C</td></tr>
+          <tr><td>2026-11-03</td><td>文化の日</td><td>平日</td><td>E</td><td>C</td></tr>
+          <tr><td>2027-02-23</td><td>天皇誕生日</td><td>平日</td><td>E</td><td>M</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">5月3日の翌日からの週（5/4〜5/10）は空週です。みどりの日、こどもの日、振替休日は救急日ではありません。成人の日（2026-01-12）も、前日の日曜が救急日のあとの空週に入ります。</p>
+  </section>
+
+  <div class="two">
+    <section class="card good">
+      <h2>別列のメリット</h2>
+      <ul>
+        <li>土日が4人で回り続けなくなります。2026年は土日が14回なので、別列なら全員1回です。</li>
+        <li>8日おきの救急日と、平日の遅出は、そのままです。</li>
+        <li>人数を14人のまま直せます。あとから人数が変わっても、土日列を分けておけば土日は順に進みます。</li>
+      </ul>
+    </section>
+    <section class="card bad" id="demerits">
+      <h2>別列のデメリット</h2>
+      <ul>
+        <li>表が2枚になります。金曜の次の担当が、土曜の担当とは限りません。</li>
+        <li>8日後に同じ人がもう一度入ることがあります。同じ順では A が 2026-10-02（金）の次の 10-10（土）、B が 10-18（日）の次の 10-26（月）。Hからでは H が 2027-10-29（金）の次の 11-06（土）、I が 11-14（日）の次の 11-22（月）。現状の間隔はいつも112日です。</li>
+        <li>平日の祝日は平日列に残ります。この周期では文化の日と天皇誕生日がそれです。</li>
+        <li>空週の土日祝は、別列を作っても担当が決まりません。</li>
+        <li>救急日でない土日は、その週の救急日が平日なら平日列、土日なら土日列の人が見ます。</li>
+        <li>同じ順は、この2年の合計が5回の人と7回の人が出ます。Hからにすると合計は6回か7回です。その代わり、土日列の開始の文字を別に覚えます。</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>空週は13回</h2>
+    <p>日曜の救急日の次は8日後の月曜なので、あいだの1週間に救急日がありません。月曜〜日曜で数えると、期間に重なる空週は13回です。この週の土日祝を「その週の救急待機」に渡すルールのままでは、渡す相手がいません。直前の日曜担当が続けるか、次の月曜担当が見るかは、ここでは決めていません。</p>
+    <div class="dates"><span>1/12〜1/18</span><span>3/9〜3/15</span><span>5/4〜5/10</span><span>6/29〜7/5</span><span>8/24〜8/30</span><span>10/19〜10/25</span><span>12/14〜12/20</span><span>2/8〜2/14</span><span>4/5〜4/11</span><span>5/31〜6/6</span><span>7/26〜8/1</span><span>9/20〜9/26</span><span>11/15〜11/21</span></div>
+    <p class="note" style="margin-top:10px">基点の直後の空週は 10/19〜10/25 です。10/18（日）が C の救急日で、次は 10/26（月）です。</p>
+  </section>
+
+  <section class="card">
+    <h2>人数が14人でなくなったとき</h2>
+    <p>今の固定は、人数が7の倍数のときに起きます。13人で長いあいだ回すと、1本の列のままでも曜日は混ざります。混ざるまでのあいだは、土日が一部の人に寄ります。別列にしておけば、人数が7の倍数のままでも土日は順に進みます。</p>
+  </section>
+</main>
+<script>
+const EVENTS = [{"iso": "2026-01-03", "main": 9, "same": 5, "off": 12, "kind": "we", "hol": ""}, {"iso": "2026-01-11", "main": 10, "same": 6, "off": 13, "kind": "we", "hol": ""}, {"iso": "2026-01-19", "main": 11, "same": 5, "off": 5, "kind": "wd", "hol": ""}, {"iso": "2026-01-27", "main": 12, "same": 6, "off": 6, "kind": "wd", "hol": ""}, {"iso": "2026-02-04", "main": 13, "same": 7, "off": 7, "kind": "wd", "hol": ""}, {"iso": "2026-02-12", "main": 14, "same": 8, "off": 8, "kind": "wd", "hol": ""}, {"iso": "2026-02-20", "main": 1, "same": 9, "off": 9, "kind": "wd", "hol": ""}, {"iso": "2026-02-28", "main": 2, "same": 7, "off": 14, "kind": "we", "hol": ""}, {"iso": "2026-03-08", "main": 3, "same": 8, "off": 1, "kind": "we", "hol": ""}, {"iso": "2026-03-16", "main": 4, "same": 10, "off": 10, "kind": "wd", "hol": ""}, {"iso": "2026-03-24", "main": 5, "same": 11, "off": 11, "kind": "wd", "hol": ""}, {"iso": "2026-04-01", "main": 6, "same": 12, "off": 12, "kind": "wd", "hol": ""}, {"iso": "2026-04-09", "main": 7, "same": 13, "off": 13, "kind": "wd", "hol": ""}, {"iso": "2026-04-17", "main": 8, "same": 14, "off": 14, "kind": "wd", "hol": ""}, {"iso": "2026-04-25", "main": 9, "same": 9, "off": 2, "kind": "we", "hol": ""}, {"iso": "2026-05-03", "main": 10, "same": 10, "off": 3, "kind": "we", "hol": "憲法記念日"}, {"iso": "2026-05-11", "main": 11, "same": 1, "off": 1, "kind": "wd", "hol": ""}, {"iso": "2026-05-19", "main": 12, "same": 2, "off": 2, "kind": "wd", "hol": ""}, {"iso": "2026-05-27", "main": 13, "same": 3, "off": 3, "kind": "wd", "hol": ""}, {"iso": "2026-06-04", "main": 14, "same": 4, "off": 4, "kind": "wd", "hol": ""}, {"iso": "2026-06-12", "main": 1, "same": 5, "off": 5, "kind": "wd", "hol": ""}, {"iso": "2026-06-20", "main": 2, "same": 11, "off": 4, "kind": "we", "hol": ""}, {"iso": "2026-06-28", "main": 3, "same": 12, "off": 5, "kind": "we", "hol": ""}, {"iso": "2026-07-06", "main": 4, "same": 6, "off": 6, "kind": "wd", "hol": ""}, {"iso": "2026-07-14", "main": 5, "same": 7, "off": 7, "kind": "wd", "hol": ""}, {"iso": "2026-07-22", "main": 6, "same": 8, "off": 8, "kind": "wd", "hol": ""}, {"iso": "2026-07-30", "main": 7, "same": 9, "off": 9, "kind": "wd", "hol": ""}, {"iso": "2026-08-07", "main": 8, "same": 10, "off": 10, "kind": "wd", "hol": ""}, {"iso": "2026-08-15", "main": 9, "same": 13, "off": 6, "kind": "we", "hol": ""}, {"iso": "2026-08-23", "main": 10, "same": 14, "off": 7, "kind": "we", "hol": ""}, {"iso": "2026-08-31", "main": 11, "same": 11, "off": 11, "kind": "wd", "hol": ""}, {"iso": "2026-09-08", "main": 12, "same": 12, "off": 12, "kind": "wd", "hol": ""}, {"iso": "2026-09-16", "main": 13, "same": 13, "off": 13, "kind": "wd", "hol": ""}, {"iso": "2026-09-24", "main": 14, "same": 14, "off": 14, "kind": "wd", "hol": ""}, {"iso": "2026-10-02", "main": 1, "same": 1, "off": 1, "kind": "wd", "hol": ""}, {"iso": "2026-10-10", "main": 2, "same": 1, "off": 8, "kind": "we", "hol": ""}, {"iso": "2026-10-18", "main": 3, "same": 2, "off": 9, "kind": "we", "hol": ""}, {"iso": "2026-10-26", "main": 4, "same": 2, "off": 2, "kind": "wd", "hol": ""}, {"iso": "2026-11-03", "main": 5, "same": 3, "off": 3, "kind": "wd", "hol": "文化の日"}, {"iso": "2026-11-11", "main": 6, "same": 4, "off": 4, "kind": "wd", "hol": ""}, {"iso": "2026-11-19", "main": 7, "same": 5, "off": 5, "kind": "wd", "hol": ""}, {"iso": "2026-11-27", "main": 8, "same": 6, "off": 6, "kind": "wd", "hol": ""}, {"iso": "2026-12-05", "main": 9, "same": 3, "off": 10, "kind": "we", "hol": ""}, {"iso": "2026-12-13", "main": 10, "same": 4, "off": 11, "kind": "we", "hol": ""}, {"iso": "2026-12-21", "main": 11, "same": 7, "off": 7, "kind": "wd", "hol": ""}, {"iso": "2026-12-29", "main": 12, "same": 8, "off": 8, "kind": "wd", "hol": ""}, {"iso": "2027-01-06", "main": 13, "same": 9, "off": 9, "kind": "wd", "hol": ""}, {"iso": "2027-01-14", "main": 14, "same": 10, "off": 10, "kind": "wd", "hol": ""}, {"iso": "2027-01-22", "main": 1, "same": 11, "off": 11, "kind": "wd", "hol": ""}, {"iso": "2027-01-30", "main": 2, "same": 5, "off": 12, "kind": "we", "hol": ""}, {"iso": "2027-02-07", "main": 3, "same": 6, "off": 13, "kind": "we", "hol": ""}, {"iso": "2027-02-15", "main": 4, "same": 12, "off": 12, "kind": "wd", "hol": ""}, {"iso": "2027-02-23", "main": 5, "same": 13, "off": 13, "kind": "wd", "hol": "天皇誕生日"}, {"iso": "2027-03-03", "main": 6, "same": 14, "off": 14, "kind": "wd", "hol": ""}, {"iso": "2027-03-11", "main": 7, "same": 1, "off": 1, "kind": "wd", "hol": ""}, {"iso": "2027-03-19", "main": 8, "same": 2, "off": 2, "kind": "wd", "hol": ""}, {"iso": "2027-03-27", "main": 9, "same": 7, "off": 14, "kind": "we", "hol": ""}, {"iso": "2027-04-04", "main": 10, "same": 8, "off": 1, "kind": "we", "hol": ""}, {"iso": "2027-04-12", "main": 11, "same": 3, "off": 3, "kind": "wd", "hol": ""}, {"iso": "2027-04-20", "main": 12, "same": 4, "off": 4, "kind": "wd", "hol": ""}, {"iso": "2027-04-28", "main": 13, "same": 5, "off": 5, "kind": "wd", "hol": ""}, {"iso": "2027-05-06", "main": 14, "same": 6, "off": 6, "kind": "wd", "hol": ""}, {"iso": "2027-05-14", "main": 1, "same": 7, "off": 7, "kind": "wd", "hol": ""}, {"iso": "2027-05-22", "main": 2, "same": 9, "off": 2, "kind": "we", "hol": ""}, {"iso": "2027-05-30", "main": 3, "same": 10, "off": 3, "kind": "we", "hol": ""}, {"iso": "2027-06-07", "main": 4, "same": 8, "off": 8, "kind": "wd", "hol": ""}, {"iso": "2027-06-15", "main": 5, "same": 9, "off": 9, "kind": "wd", "hol": ""}, {"iso": "2027-06-23", "main": 6, "same": 10, "off": 10, "kind": "wd", "hol": ""}, {"iso": "2027-07-01", "main": 7, "same": 11, "off": 11, "kind": "wd", "hol": ""}, {"iso": "2027-07-09", "main": 8, "same": 12, "off": 12, "kind": "wd", "hol": ""}, {"iso": "2027-07-17", "main": 9, "same": 11, "off": 4, "kind": "we", "hol": ""}, {"iso": "2027-07-25", "main": 10, "same": 12, "off": 5, "kind": "we", "hol": ""}, {"iso": "2027-08-02", "main": 11, "same": 13, "off": 13, "kind": "wd", "hol": ""}, {"iso": "2027-08-10", "main": 12, "same": 14, "off": 14, "kind": "wd", "hol": ""}, {"iso": "2027-08-18", "main": 13, "same": 1, "off": 1, "kind": "wd", "hol": ""}, {"iso": "2027-08-26", "main": 14, "same": 2, "off": 2, "kind": "wd", "hol": ""}, {"iso": "2027-09-03", "main": 1, "same": 3, "off": 3, "kind": "wd", "hol": ""}, {"iso": "2027-09-11", "main": 2, "same": 13, "off": 6, "kind": "we", "hol": ""}, {"iso": "2027-09-19", "main": 3, "same": 14, "off": 7, "kind": "we", "hol": ""}, {"iso": "2027-09-27", "main": 4, "same": 4, "off": 4, "kind": "wd", "hol": ""}, {"iso": "2027-10-05", "main": 5, "same": 5, "off": 5, "kind": "wd", "hol": ""}, {"iso": "2027-10-13", "main": 6, "same": 6, "off": 6, "kind": "wd", "hol": ""}, {"iso": "2027-10-21", "main": 7, "same": 7, "off": 7, "kind": "wd", "hol": ""}, {"iso": "2027-10-29", "main": 8, "same": 8, "off": 8, "kind": "wd", "hol": ""}, {"iso": "2027-11-06", "main": 9, "same": 1, "off": 8, "kind": "we", "hol": ""}, {"iso": "2027-11-14", "main": 10, "same": 2, "off": 9, "kind": "we", "hol": ""}, {"iso": "2027-11-22", "main": 11, "same": 9, "off": 9, "kind": "wd", "hol": ""}, {"iso": "2027-11-30", "main": 12, "same": 10, "off": 10, "kind": "wd", "hol": ""}, {"iso": "2027-12-08", "main": 13, "same": 11, "off": 11, "kind": "wd", "hol": ""}, {"iso": "2027-12-16", "main": 14, "same": 12, "off": 12, "kind": "wd", "hol": ""}, {"iso": "2027-12-24", "main": 1, "same": 13, "off": 13, "kind": "wd", "hol": ""}];
+const HOLS = {"2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日", "2026-07-20": "海の日", "2026-08-11": "山の日", "2026-09-21": "敬老の日", "2026-09-22": "国民の休日", "2026-09-23": "秋分の日", "2026-10-12": "スポーツの日", "2026-11-03": "文化の日", "2026-11-23": "勤労感謝の日", "2027-01-01": "元日", "2027-01-11": "成人の日", "2027-02-11": "建国記念の日", "2027-02-23": "天皇誕生日", "2027-03-21": "春分の日", "2027-03-22": "振替休日", "2027-04-29": "昭和の日", "2027-05-03": "憲法記念日", "2027-05-04": "みどりの日", "2027-05-05": "こどもの日", "2027-07-19": "海の日", "2027-08-11": "山の日", "2027-09-20": "敬老の日", "2027-09-23": "秋分の日", "2027-10-11": "スポーツの日", "2027-11-03": "文化の日", "2027-11-23": "勤労感謝の日"};
+const byIso = Object.fromEntries(EVENTS.map(e => [e.iso, e]));
+const WD = ["月","火","水","木","金","土","日"];
+
+function iso(y,m,d) {
+  return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+}
+const LETTER = "ABCDEFGHIJKLMN";
+function letter(n) { return LETTER[n - 1]; }
+function person(e, mode) {
+  const n = mode === "main" ? e.main : mode === "same" ? e.same : (e.kind === "we" ? e.off : e.same);
+  return letter(n);
+}
+function build() {
+  const root = document.getElementById("months");
+  for (let y = 2026; y <= 2027; y++) {
+    for (let m = 1; m <= 12; m++) {
+      const box = document.createElement("section");
+      box.className = "month";
+      const h = document.createElement("h3");
+      h.textContent = y + "年" + m + "月";
+      box.appendChild(h);
+      const dow = document.createElement("div");
+      dow.className = "dow";
+      WD.forEach((w,i) => {
+        const s = document.createElement("span");
+        s.textContent = w;
+        if (i === 5) s.className = "sat";
+        if (i === 6) s.className = "sun";
+        dow.appendChild(s);
+      });
+      box.appendChild(dow);
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      const first = new Date(y, m-1, 1);
+      const startPad = (first.getDay() + 6) % 7;
+      const last = new Date(y, m, 0).getDate();
+      for (let i = 0; i < startPad; i++) {
+        const c = document.createElement("div");
+        c.className = "cell";
+        grid.appendChild(c);
+      }
+      for (let d = 1; d <= last; d++) {
+        const id = iso(y,m,d);
+        const e = byIso[id];
+        const c = document.createElement("div");
+        c.className = "cell";
+        const dt = new Date(y, m-1, d);
+        const w = (dt.getDay() + 6) % 7;
+        if (e) {
+          c.classList.add("em");
+          if (e.kind === "we" && w === 5) c.classList.add("sat");
+          if (e.kind === "we" && w === 6) c.classList.add("sun");
+          if (id === "2026-10-02") c.classList.add("anchor");
+          c.dataset.iso = id;
+        }
+        if (HOLS[id]) {
+          c.classList.add("hol");
+          c.title = HOLS[id];
+        }
+        const dn = document.createElement("span");
+        dn.className = "dn";
+        dn.textContent = String(d);
+        const who = document.createElement("span");
+        who.className = "who";
+        c.appendChild(dn);
+        c.appendChild(who);
+        grid.appendChild(c);
+      }
+      box.appendChild(grid);
+      root.appendChild(box);
+    }
+  }
+}
+function paint(mode) {
+  document.querySelectorAll(".cell[data-iso]").forEach(c => {
+    const e = byIso[c.dataset.iso];
+    c.querySelector(".who").textContent = String(person(e, mode));
+  });
+  document.querySelectorAll(".toggles button").forEach(b => {
+    b.classList.toggle("on", b.dataset.mode === mode);
+  });
+}
+build();
+paint("main");
+document.querySelector(".toggles").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  paint(b.dataset.mode);
+});
+</script>
+</body>
+</html>
