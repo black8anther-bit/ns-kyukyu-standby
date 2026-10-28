@@ -167,6 +167,8 @@ th { font-size:12px; color:var(--muted); font-weight:600; }
 tr.sat td { color:var(--sat); }
 tr.sun td { color:var(--sun); }
 tbody tr:nth-child(odd) { background:rgba(255,255,255,.28); }
+table.rota { max-width:440px; }
+table.rota td.who { font-size:22px; font-weight:700; width:3.2em; }
 .two { display:grid; grid-template-columns:1fr; gap:12px; }
 @media (min-width:800px) { .two { grid-template-columns:1fr 1fr; } }
 .good h2 { color:#0f766e; }
@@ -354,6 +356,33 @@ a { color:var(--ink); }
     <p class="note" style="margin-top:12px">2026年の土日は14回です。別列は、同じ順でも Hからでも、14人とも1回です。現状は I と J が4回、B と C が3回です。</p>
     <p class="note">2027年の土日は12回です。現状は4人が3回ずつ。同じ順では C と D が0回、ほかは1回。Hからでは J と K が0回、ほかは1回です。</p>
     <p class="note">合計（平日＋土日）は、現状が6か7回、同じ順が5〜7回、Hからが6か7回です。平日の内訳は、別列では開始の文字を変えても同じです。</p>
+  </section>
+
+  <section class="card" id="rota">
+    <h2>2026年12月〜2027年12月</h2>
+    <p>14人で土日の救急日を回した表です。2026年10月10日を A として、土日の救急日ごとに次の文字へ進みます。この期間は14回で、C から B まで各自1回です。</p>
+    <div class="wrap">
+      <table class="rota">
+        <thead><tr><th>日付</th><th>曜</th><th>担当</th></tr></thead>
+        <tbody>
+          <tr class="sat"><td>2026-12-05</td><td>土</td><td class="who">C</td></tr>
+          <tr class="sun"><td>2026-12-13</td><td>日</td><td class="who">D</td></tr>
+          <tr class="sat"><td>2027-01-30</td><td>土</td><td class="who">E</td></tr>
+          <tr class="sun"><td>2027-02-07</td><td>日</td><td class="who">F</td></tr>
+          <tr class="sat"><td>2027-03-27</td><td>土</td><td class="who">G</td></tr>
+          <tr class="sun"><td>2027-04-04</td><td>日</td><td class="who">H</td></tr>
+          <tr class="sat"><td>2027-05-22</td><td>土</td><td class="who">I</td></tr>
+          <tr class="sun"><td>2027-05-30</td><td>日</td><td class="who">J</td></tr>
+          <tr class="sat"><td>2027-07-17</td><td>土</td><td class="who">K</td></tr>
+          <tr class="sun"><td>2027-07-25</td><td>日</td><td class="who">L</td></tr>
+          <tr class="sat"><td>2027-09-11</td><td>土</td><td class="who">M</td></tr>
+          <tr class="sun"><td>2027-09-19</td><td>日</td><td class="who">N</td></tr>
+          <tr class="sat"><td>2027-11-06</td><td>土</td><td class="who">A</td></tr>
+          <tr class="sun"><td>2027-11-14</td><td>日</td><td class="who">B</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">2027年12月の救急日は8日（水）、16日（木）、24日（金）です。この月に土日の救急日はありません。</p>
   </section>
 
   <section class="card" id="cal">
